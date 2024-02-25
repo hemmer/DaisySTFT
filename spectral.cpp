@@ -1,5 +1,5 @@
 #include <string.h>
-#include "daisy_seed.h"
+#include "daisy_patch_sm.h"
 #include "daisysp.h"
 
 #include <cmath>
@@ -9,6 +9,7 @@
 #include "fourier.h"
 #include "wave.h"
 
+
 #define PI 3.1415926535897932384626433832795
 #define SR 48000
 typedef float S; // sample type
@@ -16,6 +17,8 @@ typedef float S; // sample type
 using namespace daisy;
 using namespace daisysp;
 using namespace soundmath;
+using namespace patch_sm;
+
 
 // convenient lookup tables
 Wave<S> hann([] (S phase) -> S { return 0.5 * (1 - cos(2 * PI * phase)); });
@@ -24,7 +27,7 @@ Wave<S> halfhann([] (S phase) -> S { return sin(PI * phase); });
 const size_t bsize = 256;
 
 bool controls_processed = false;
-DaisySeed hw;
+DaisyPatchSM hw;
 
 // 4 overlapping windows of size 2^12 = 4096
 const size_t order = 12;
@@ -56,6 +59,7 @@ static void Callback(AudioHandle::InterleavingInputBuffer in,
 		stft->write(in[i]); // put a new sample in the STFT
 		out[i] = stft->read(); // read the next sample from the STFT
 		out[i + 1] = out[i];
+		// out[i] = in[i];
 	}
 }
 
@@ -120,6 +124,7 @@ int main(void)
 	hw.adc.Init(configs, num_controls);
 */
 
+	hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
 	hw.SetAudioBlockSize(bsize);
 	hw.StartAudio(Callback);
 

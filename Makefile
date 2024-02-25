@@ -5,8 +5,9 @@ TARGET = spectral
 CPP_SOURCES = spectral.cpp
 
 # Library Locations
-DAISYSP_DIR ?= ../DaisySP
-LIBDAISY_DIR ?= ../libDaisy
+DAISYSP_DIR ?= ./DaisySP
+LIBDAISY_DIR ?= ./libDaisy
+USE_FATFS = 1
 
 CPP_STANDARD ?= -std=gnu++17
 OPT ?= -O3
