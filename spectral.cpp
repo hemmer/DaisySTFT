@@ -35,13 +35,21 @@ const size_t N = (1 << order);
 const S sqrtN = sqrt(N);
 const size_t laps = 4;
 const size_t buffsize = 2 * laps * N;
+const float bufferLengthSecs = (buffsize / 2) / (float) SR;
 
+#define SDRAM 1
 // buffers for STFT processing
 // audio --> in --(fft)--> middle --(process)--> out --(ifft)--> in -->
 // each of these is a few circular buffers stacked end-to-end.
-S in[buffsize]; // buffers for input and output (from / to user audio callback)
-S middle[buffsize]; // buffers for unprocessed frequency domain data
-S out[buffsize]; // buffers for processed frequency domain data
+#ifdef SDRAM
+	S DSY_SDRAM_BSS in[buffsize]; // buffers for input and output (from / to user audio callback)
+	S DSY_SDRAM_BSS middle[buffsize]; // buffers for unprocessed frequency domain data
+	S DSY_SDRAM_BSS out[buffsize]; // buffers for processed frequency domain data
+#else
+	S in[buffsize]; // buffers for input and output (from / to user audio callback)
+	S middle[buffsize]; // buffers for unprocessed frequency domain data
+	S out[buffsize]; // buffers for processed frequency domain data
+#endif
 
 ShyFFT<S, N, RotationPhasor>* fft; // fft object
 Fourier<S, N>* stft; // stft object
@@ -60,10 +68,10 @@ static void Callback(AudioHandle::InterleavingInputBuffer in,
 	hw.ProcessAllControls();
 
 	/** Get CV_1 Input (0, 1) */
-	beta = hw.GetAdcValue(CV_1);
-	thresh = hw.GetAdcValue(CV_2) * 30.;
+	beta = hw.GetAdcValue(CV_1) + hw.GetAdcValue(CV_5);
+	thresh = (hw.GetAdcValue(CV_2) + hw.GetAdcValue(CV_6)) * 30.;
 
-
+	// only reads from left but write to both left and right
 	for (size_t i = 0; i < size; i += 2) {
 		stft->write(in[i]); // put a new sample in the STFT
 		out[i] = stft->read(); // read the next sample from the STFT
@@ -100,21 +108,17 @@ inline void denoise(const S* in, S* out) {
 	}
 }
 
+inline void passthrough(const S* in, S* out) {
+	memcpy(out, in, N * sizeof(S));
+}
+
 int main(void) {
 	hw.Init();
 
 	// initialize FFT and STFT objects
 	fft = new ShyFFT<S, N, RotationPhasor>();
 	fft->Init();
-	stft = new Fourier<S, N>(denoise, fft, &hann, laps, in, middle, out);
-
-	/*
-		// Add control initialiation here, for example:
-		AdcChannelConfig configs[num_controls]; // one config per control
-		for (size_t i = 0; i < num_controls; i++)
-			configs[i].InitSingle(seed.GetPin(control_pins[i]));
-		hw.adc.Init(configs, num_controls);
-	*/
+	stft = new Fourier<S, N>(passthrough, fft, &hann, laps, in, middle, out);
 
 	hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
 	hw.SetAudioBlockSize(bsize);
