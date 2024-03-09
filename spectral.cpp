@@ -10,7 +10,7 @@
 #include "wave.h"
 
 
-#define PI 3.1415926535897932384626433832795
+//#define PI 3.1415926535897932384626433832795
 #define SR 48000
 typedef float S; // sample type
 
@@ -37,7 +37,7 @@ const size_t laps = 4;
 const size_t buffsize = 2 * laps * N;
 const float bufferLengthSecs = (buffsize / 2) / (float) SR;
 
-#define SDRAM 1
+// #define SDRAM 
 // buffers for STFT processing
 // audio --> in --(fft)--> middle --(process)--> out --(ifft)--> in -->
 // each of these is a few circular buffers stacked end-to-end.
@@ -51,7 +51,7 @@ const float bufferLengthSecs = (buffsize / 2) / (float) SR;
 	S out[buffsize]; // buffers for processed frequency domain data
 #endif
 
-ShyFFT<S, N, RotationPhasor>* fft; // fft object
+arm_rfft_fast_instance_f32 DSY_SDRAM_BSS fft;
 Fourier<S, N>* stft; // stft object
 
 // initial parameters for denoise process
@@ -73,7 +73,7 @@ static void Callback(AudioHandle::InterleavingInputBuffer in,
 
 	// only reads from left but write to both left and right
 	for (size_t i = 0; i < size; i += 2) {
-		stft->write(in[i]); // put a new sample in the STFT
+		stft->write(in[i], &fft); // put a new sample in the STFT
 		out[i] = stft->read(); // read the next sample from the STFT
 		out[i + 1] = out[i];
 		// out[i] = in[i];
@@ -115,10 +115,9 @@ inline void passthrough(const S* in, S* out) {
 int main(void) {
 	hw.Init();
 
-	// initialize FFT and STFT objects
-	fft = new ShyFFT<S, N, RotationPhasor>();
-	fft->Init();
-	stft = new Fourier<S, N>(passthrough, fft, &hann, laps, in, middle, out);
+	// initialize FFT and STFT objects	
+	arm_rfft_fast_init_f32(&fft, N);
+	stft = new Fourier<S, N>(passthrough, &hann, laps, in, middle, out);
 
 	hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
 	hw.SetAudioBlockSize(bsize);
@@ -128,5 +127,4 @@ int main(void) {
 	while (true) {	}
 
 	delete stft;
-	delete fft;
 }
